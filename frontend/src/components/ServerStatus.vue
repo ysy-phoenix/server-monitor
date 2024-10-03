@@ -53,7 +53,7 @@
                         <div class="mb-12">
                             <h3 class="text-3xl font-semibold text-gray-800 mb-6">CPU 违规使用记录</h3>
                             <InfoBox class="mb-8">
-                                CPU 违规为每台机器使用 CPU 核数超过 1 / 4, 仅显示使用率超过 90% 的记录，数据仅存七天。
+                                CPU 违规为每台机器使用 CPU 核数超过 1 / 4，仅显示使用率超过 90% 的记录，数据仅存七天。
                             </InfoBox>
                             <!-- 筛选器 -->
                             <div class="mb-6 flex flex-wrap gap-4">

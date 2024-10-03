@@ -114,7 +114,7 @@ def get_detailed_status() -> List[ServerStatus]:
 
 
 def save_to_csv(data: List[ServerStatus]) -> None:
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = (datetime.utcnow() + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M:%S")
     df = pd.DataFrame(
         [
             {
