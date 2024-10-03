@@ -430,7 +430,7 @@ export default {
 
         // 修改 cpuTotalPages 计算属性
         const cpuTotalPages = computed(() => {
-            return Math.ceil(filteredAndSortedCpuHistory.value.length / cpuItemsPerPage.value);
+            return Math.ceil(groupedCpuHistory.value.length / cpuItemsPerPage.value);
         });
 
         // 页面导航函数
