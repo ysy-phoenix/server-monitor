@@ -12,7 +12,7 @@ Thumbs.db
 __pycache__/
 *.py[cod]
 *.so
-.Python 
+.Python
 env/
 venv/
 ENV/
@@ -36,6 +36,7 @@ yarn-error.log*
 # 数据文件 (如果有敏感数据)
 *.csv
 *.json
+!package.json
 
 # 密钥文件 (为了安全)
 *.pem

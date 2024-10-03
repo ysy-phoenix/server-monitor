@@ -7,7 +7,7 @@
 ## 资源一览
 
 - Microsoft Azure 上的 Ubuntu 1 核 1 G云服务器（来自 Student Pack）
-- Cloudflare 上的域名 (eviloder.win)
+- Cloudflare 上的域名 (eviloder.win), 部署在 server.eviloder.win
 
 ## 配置流程
 
@@ -142,4 +142,6 @@
 
 - 检查后端日志: `sudo journalctl -u server-monitor-backend`
 - 检查 Nginx 日志: `sudo tail -f /var/log/nginx/error.log`
-
+- 后端重启: `sudo systemctl restart server-monitor-backend`
+- 前端重构: `npm run build`
+- Nginx 重启: `sudo systemctl restart nginx`

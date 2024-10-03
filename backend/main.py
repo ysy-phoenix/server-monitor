@@ -8,8 +8,8 @@ import asyncio
 from datetime import datetime, timedelta
 from monitor import *
 import pandas as pd
-
-app = FastAPI()
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from contextlib import asynccontextmanager
 
 
 class GPUInfo(BaseModel):
@@ -48,27 +48,16 @@ origins = [
     "http://localhost",
     "http://localhost:8080",
     "http://127.0.0.1:8080",
-    "http://server.evioder.win",
+    "https://server.eviloder.win",
 ]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 STATUS_CACHE = []
 CPU_HISTORY_CACHE = []
 GPU_HISTORY_CACHE = []
-LAST_STATUS_UPDATE = None
-LAST_CPU_HISTORY_UPDATE = None
-LAST_GPU_HISTORY_UPDATE = None
-STATUS_FILE = "./data/status.csv"
-CPU_FILE = "./data/cpu_history.csv"
-GPU_FILE = "./data/gpu_history.csv"
-INTERVAL = 600
+STATUS_FILE = os.path.join(os.getcwd(), "data/status.csv")
+CPU_FILE = os.path.join(os.getcwd(), "data/cpu_history.csv")
+GPU_FILE = os.path.join(os.getcwd(), "data/gpu_history.csv")
+INTERVAL = 20 if not DEBUG else 1  # minutes
 
 
 def get_detailed_status() -> List[ServerStatus]:
@@ -124,70 +113,6 @@ def get_detailed_status() -> List[ServerStatus]:
     return server_status
 
 
-def trim_history(file: str) -> List[Dict]:
-    if os.path.getsize(file) == 0:
-        return []
-    one_week_ago = datetime.now() - timedelta(days=7)
-    df = pd.read_csv(file)
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
-    df = df[df["timestamp"] > one_week_ago]
-    df.to_csv(file, index=False)
-    return df.to_dict("records")
-
-
-def get_cpu_history():
-    return trim_history(CPU_FILE)
-
-
-def get_gpu_history():
-    return trim_history(GPU_FILE)
-
-
-OPERATIONS = {
-    "status": get_detailed_status(),
-    "cpu_history": get_cpu_history(),
-    "gpu_history": get_gpu_history(),
-}
-
-
-async def update_cache(
-    cache: List[Dict], last_update: float, operation: str
-) -> Tuple[List[Dict], float]:
-    if last_update is None or time.time() - last_update > INTERVAL:
-        cache = OPERATIONS[operation]
-        last_update = time.time()
-        if operation == "status":
-            save_to_csv(cache)
-    return cache, last_update
-
-
-@app.get("/api/status", response_model=List[ServerStatus])
-async def get_server_status() -> List[ServerStatus]:
-    global STATUS_CACHE, LAST_STATUS_UPDATE
-    STATUS_CACHE, LAST_STATUS_UPDATE = await update_cache(
-        STATUS_CACHE, LAST_STATUS_UPDATE, "status"
-    )
-    return STATUS_CACHE
-
-
-@app.get("/api/cpu_history", response_model=List[Dict])
-async def get_cpu_history() -> List[Dict]:
-    global CPU_HISTORY_CACHE, LAST_CPU_HISTORY_UPDATE
-    CPU_HISTORY_CACHE, LAST_CPU_HISTORY_UPDATE = await update_cache(
-        CPU_HISTORY_CACHE, LAST_CPU_HISTORY_UPDATE, "cpu_history"
-    )
-    return CPU_HISTORY_CACHE
-
-
-@app.get("/api/gpu_history", response_model=List[Dict])
-async def get_gpu_history() -> List[Dict]:
-    global GPU_HISTORY_CACHE, LAST_GPU_HISTORY_UPDATE
-    GPU_HISTORY_CACHE, LAST_GPU_HISTORY_UPDATE = await update_cache(
-        GPU_HISTORY_CACHE, LAST_GPU_HISTORY_UPDATE, "gpu_history"
-    )
-    return GPU_HISTORY_CACHE
-
-
 def save_to_csv(data: List[ServerStatus]) -> None:
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     df = pd.DataFrame(
@@ -211,7 +136,6 @@ def save_to_csv(data: List[ServerStatus]) -> None:
                 {
                     "timestamp": now,
                     "name": server.name,
-                    "type": "CPU",
                     "user": invalid_cpu.user,
                     "command": invalid_cpu.command,
                     "usage": invalid_cpu.usage,
@@ -229,7 +153,6 @@ def save_to_csv(data: List[ServerStatus]) -> None:
                 {
                     "timestamp": now,
                     "name": server.name,
-                    "type": "GPU",
                     "user": invalid_gpu.user,
                     "error": invalid_gpu.error,
                     "index": invalid_gpu.index,
@@ -245,6 +168,60 @@ def save_to_csv(data: List[ServerStatus]) -> None:
         )
         header = os.path.getsize(GPU_FILE) == 0
         df.to_csv(GPU_FILE, mode="a", header=header, index=False)
+
+
+def trim_history(file: str) -> List[Dict]:
+    if os.path.getsize(file) == 0:
+        return []
+    one_week_ago = datetime.now() - timedelta(days=7)
+    df = pd.read_csv(file)
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df = df[df["timestamp"] > one_week_ago]
+    df.to_csv(file, index=False)
+    return df.to_dict("records")
+
+
+async def update_all_caches() -> None:
+    global STATUS_CACHE, CPU_HISTORY_CACHE, GPU_HISTORY_CACHE
+    STATUS_CACHE = get_detailed_status()
+    save_to_csv(STATUS_CACHE)
+    CPU_HISTORY_CACHE = trim_history(CPU_FILE)
+    GPU_HISTORY_CACHE = trim_history(GPU_FILE)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(update_all_caches, "interval", minutes=INTERVAL)
+    scheduler.start()
+    await update_all_caches()  # update caches immediately when server starts
+    yield
+    scheduler.shutdown()
+
+
+app = FastAPI(lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/api/status", response_model=List[ServerStatus])
+async def get_server_status() -> List[ServerStatus]:
+    return STATUS_CACHE
+
+
+@app.get("/api/cpu_history", response_model=List[Dict])
+async def get_cpu_history() -> List[Dict]:
+    return CPU_HISTORY_CACHE
+
+
+@app.get("/api/gpu_history", response_model=List[Dict])
+async def get_gpu_history() -> List[Dict]:
+    return GPU_HISTORY_CACHE
 
 
 async def test():

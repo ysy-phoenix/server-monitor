@@ -90,8 +90,10 @@ def check_cpu_usage(ssh: paramiko.SSHClient):
             )
             user_cpus[user].append((command, cpu_percent))
     for user, cpus in user_cpus.items():
-        if sum([cpu for _, cpu in cpus]) > upperbound:
+        total_cpu_percent = sum([cpu for _, cpu in cpus])
+        if total_cpu_percent > upperbound:
             invalid_user_cpus[user] = cpus
+            invalid_user_cpus[user].append(("[TOTAL CPU USAGE]", total_cpu_percent))
     return invalid_user_cpus
 
 

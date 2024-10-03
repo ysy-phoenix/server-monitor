@@ -3,7 +3,7 @@
         <div class="container mx-auto max-w-7xl px-4">
             <h1 class="text-6xl font-bold text-gray-800 mb-12 text-center font-serif">BDAA 服务器状态</h1>
             <InfoBox class="mb-8">
-                每 10 分钟更新一次数据，每次更新约 20 秒。
+                每 20 分钟更新一次数据，每次更新约 20 秒。
             </InfoBox>
 
             <!-- 加载状态 -->
@@ -29,7 +29,7 @@
 
                             <!-- GPU 使用率 -->
                             <div>
-                                <h3 class="text-2xl font-semibold text-gray-800 mb-4">GPU 状态</h3>
+                                <h3 class="text-2xl font-semibold text-gray-800 mb-4 font-serif">GPU 状态</h3>
                                 <div class="grid grid-cols-2 gap-5">
                                     <div v-for="(gpu, index) in server.gpus" :key="index"
                                         class="bg-gray-50 rounded-lg p-4 shadow-inner">
@@ -52,6 +52,9 @@
                         <!-- CPU 历史记录 -->
                         <div class="mb-12">
                             <h3 class="text-3xl font-semibold text-gray-800 mb-6">CPU 违规使用记录</h3>
+                            <InfoBox class="mb-8">
+                                CPU 违规为每台机器使用 CPU 核数超过 1 / 4, 仅显示使用率超过 90% 的记录，数据仅存七天。
+                            </InfoBox>
                             <!-- 筛选器 -->
                             <div class="mb-6 flex flex-wrap gap-4">
                                 <input v-model="cpuFilters.startDate" type="date" @input="filterCpuHistory"
@@ -72,15 +75,15 @@
                                 <table class="min-w-full bg-white border border-gray-300 rounded-lg overflow-hidden">
                                     <thead class="bg-gray-100">
                                         <tr>
-                                            <th @click="sortCpuHistory('timestamp')" class="table-header">
+                                            <th @click="sortCpuHistory('timestamp')" class="table-header" style="white-space: nowrap;">
                                                 日期 <span v-if="cpuSortKey === 'timestamp'">{{ cpuSortOrder === 'asc' ?
                                                     '▲' : '▼' }}</span>
                                             </th>
-                                            <th @click="sortCpuHistory('name')" class="table-header">
+                                            <th @click="sortCpuHistory('name')" class="table-header" style="white-space: nowrap;">
                                                 服务器 <span v-if="cpuSortKey === 'name'">{{ cpuSortOrder === 'asc' ? '▲' :
                                                     '▼' }}</span>
                                             </th>
-                                            <th @click="sortCpuHistory('user')" class="table-header">
+                                            <th @click="sortCpuHistory('user')" class="table-header" style="white-space: nowrap;">
                                                 用户 <span v-if="cpuSortKey === 'user'">{{ cpuSortOrder === 'asc' ? '▲' :
                                                     '▼' }}</span>
                                             </th>
@@ -332,7 +335,6 @@ export default {
             cpuCurrentPage.value = 1;
         };
 
-        // 计算属性：过滤和排序后的 CPU 历史记录
         const filteredAndSortedCpuHistory = computed(() => {
             let result = cpuHistory.value.filter(record => {
                 const recordDate = new Date(record.timestamp);
@@ -343,7 +345,8 @@ export default {
                     (!startDate || recordDate >= startDate) &&
                     (!endDate || recordDate <= endDate) &&
                     record.name.toLowerCase().includes(cpuFilters.value.server.toLowerCase()) &&
-                    record.user.toLowerCase().includes(cpuFilters.value.user.toLowerCase())
+                    record.user.toLowerCase().includes(cpuFilters.value.user.toLowerCase()) &&
+                    record.usage > 90
                 );
             });
 
